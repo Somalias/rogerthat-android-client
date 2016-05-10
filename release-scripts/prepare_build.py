@@ -170,6 +170,7 @@ def startmove():
                    lambda m: '<%s android:name="%s.%s"' % (m.group(1), NEW_PACKAGE_NAME, m.group(2)),
                    s)
         s = re.sub('mdp-rogerthat', 'mdp-%s' % APP_ID, s)
+        s = re.sub('oauth-rogerthat', 'oauth-%s' % APP_ID, s)
 
         f.seek(0)
         f.write(s)

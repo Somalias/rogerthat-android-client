@@ -59,11 +59,11 @@ import org.json.simple.JSONValue;
 
 import android.Manifest;
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
@@ -78,8 +78,6 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.RemoteException;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.Html;
 import android.text.TextWatcher;
@@ -109,6 +107,7 @@ import com.mobicage.rogerth.at.R;
 import com.mobicage.rogerthat.Installation;
 import com.mobicage.rogerthat.MainActivity;
 import com.mobicage.rogerthat.MainService;
+import com.mobicage.rogerthat.OauthActivity;
 import com.mobicage.rogerthat.ServiceBoundActivity;
 import com.mobicage.rogerthat.config.Configuration;
 import com.mobicage.rogerthat.config.ConfigurationProvider;
@@ -128,7 +127,6 @@ import com.mobicage.rogerthat.util.http.HTTPUtil;
 import com.mobicage.rogerthat.util.logging.L;
 import com.mobicage.rogerthat.util.system.SafeAsyncTask;
 import com.mobicage.rogerthat.util.system.SafeBroadcastReceiver;
-import com.mobicage.rogerthat.util.system.SafeDialogInterfaceOnClickListener;
 import com.mobicage.rogerthat.util.system.SafeRunnable;
 import com.mobicage.rogerthat.util.system.SafeViewOnClickListener;
 import com.mobicage.rogerthat.util.system.T;
@@ -158,11 +156,13 @@ public class RegistrationActivity2 extends ServiceBoundActivity {
     private static final int PERMISSION_REQUEST_COARSE_LOCATION = 1;
     private static final int PERMISSION_REQUEST_GET_ACCOUNTS = 2;
 
+    private static final int START_OAUTH_REQUEST_CODE = 1;
+
     private static final int[] NORMAL_WIDTH_ROGERTHAT_LOGOS = new int[] { R.id.rogerthat_logo, R.id.rogerthat_logo1,
-            R.id.rogerthat_logo2, R.id.rogerthat_logo3, R.id.rogerthat_logo4 };
+            R.id.rogerthat_logo2, R.id.rogerthat_logo3, R.id.rogerthat_logo4, R.id.rogerthat_logo5 };
     private static final int[] FULL_WIDTH_ROGERTHAT_LOGOS = new int[] { R.id.full_width_rogerthat_logo,
             R.id.full_width_rogerthat_logo1, R.id.full_width_rogerthat_logo2, R.id.full_width_rogerthat_logo3, R.id
-            .full_width_rogerthat_logo4 };
+            .full_width_rogerthat_logo4, R.id.full_width_rogerthat_logo5 };
 
     private Intent mNotYetProcessedIntent = null;
 
@@ -471,6 +471,16 @@ public class RegistrationActivity2 extends ServiceBoundActivity {
         facebookButton.setOnClickListener(facebookLoginListener);
         facebookImage.setOnClickListener(facebookLoginListener);
 
+        View.OnClickListener oauthLoginListener = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                getOauthRegistrationInfo();
+            }
+        };
+
+        findViewById(R.id.login_via_oauth).setOnClickListener(oauthLoginListener);
+        findViewById(R.id.oauth_login).setOnClickListener(oauthLoginListener);
+
         final Button getAccountsButton = (Button) findViewById(R.id.get_accounts);
         if (configureEmailAutoComplete()) {
             // GET_ACCOUNTS permission is granted
@@ -523,6 +533,7 @@ public class RegistrationActivity2 extends ServiceBoundActivity {
         addAgreeTOSHandler();
         addIBeaconUsageHandler();
         addChooseLoginMethodHandler();
+        addOauthMethodHandler();
         addEnterEmailHandler();
         addEnterPinHandler();
         mWiz.run();
@@ -701,6 +712,239 @@ public class RegistrationActivity2 extends ServiceBoundActivity {
         });
     }
 
+    private void getOauthRegistrationInfo() {
+        final String timestamp = "" + mWiz.getTimestamp();
+        final String deviceId = mWiz.getDeviceId();
+        final String registrationId = mWiz.getRegistrationId();
+        final String installId = mWiz.getInstallationId();
+        // Make call to Rogerthat webfarm
+        final ProgressDialog progressDialog = new ProgressDialog(RegistrationActivity2.this);
+        progressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+        progressDialog.setMessage(getString(R.string.loading));
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+        final SafeRunnable showErrorDialog = new SafeRunnable() {
+            @Override
+            protected void safeRun() throws Exception {
+                T.UI();
+                progressDialog.dismiss();
+                AlertDialog.Builder builder = new AlertDialog.Builder(RegistrationActivity2.this);
+                builder.setMessage(R.string.registration_error);
+                builder.setPositiveButton(R.string.rogerthat, null);
+                AlertDialog dialog = builder.create();
+                dialog.show();
+            }
+        };
+
+        mWorkerHandler.post(new SafeRunnable() {
+            @Override
+            protected void safeRun() throws Exception {
+                T.REGISTRATION();
+                String version = "1";
+                String signature = Security.sha256(version + " " + installId + " " + timestamp + " " + deviceId + " "
+                        + registrationId + " " + "oauth" + CloudConstants.REGISTRATION_MAIN_SIGNATURE);
+
+                HttpPost httppost = new HttpPost(CloudConstants.REGISTRATION_OAUTH_INFO_URL);
+                try {
+                    List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(8);
+                    nameValuePairs.add(new BasicNameValuePair("version", version));
+                    nameValuePairs.add(new BasicNameValuePair("registration_time", timestamp));
+                    nameValuePairs.add(new BasicNameValuePair("device_id", deviceId));
+                    nameValuePairs.add(new BasicNameValuePair("registration_id", registrationId));
+                    nameValuePairs.add(new BasicNameValuePair("signature", signature));
+                    nameValuePairs.add(new BasicNameValuePair("install_id", installId));
+                    nameValuePairs.add(new BasicNameValuePair("language", Locale.getDefault().getLanguage()));
+                    nameValuePairs.add(new BasicNameValuePair("country", Locale.getDefault().getCountry()));
+                    nameValuePairs.add(new BasicNameValuePair("app_id", CloudConstants.APP_ID));
+                    nameValuePairs.add(new BasicNameValuePair("use_xmpp_kick", CloudConstants.USE_XMPP_KICK_CHANNEL
+                            + ""));
+                    nameValuePairs.add(new BasicNameValuePair("GCM_registration_id", mGCMRegistrationId));
+
+                    httppost.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+
+                    // Execute HTTP Post Request
+                    HttpResponse response = mHttpClient.execute(httppost);
+
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    HttpEntity entity = response.getEntity();
+
+                    if (entity == null) {
+                        mUIHandler.post(showErrorDialog);
+                        return;
+                    }
+
+                    @SuppressWarnings("unchecked")
+                    final Map<String, Object> responseMap = (Map<String, Object>) JSONValue
+                            .parse(new InputStreamReader(entity.getContent()));
+
+                    if (statusCode != 200 || responseMap == null) {
+                        if (statusCode == 500 && responseMap != null) {
+                            final String errorMessage = (String) responseMap.get("error");
+                            if (errorMessage != null) {
+                                mUIHandler.post(new SafeRunnable() {
+                                    @Override
+                                    protected void safeRun() throws Exception {
+                                        T.UI();
+                                        progressDialog.dismiss();
+                                        AlertDialog.Builder builder = new AlertDialog.Builder(
+                                                RegistrationActivity2.this);
+                                        builder.setMessage(errorMessage);
+                                        builder.setPositiveButton(R.string.rogerthat, null);
+                                        AlertDialog dialog = builder.create();
+                                        dialog.show();
+                                    }
+                                });
+                                return;
+                            }
+                        }
+                        mUIHandler.post(showErrorDialog);
+                        return;
+                    }
+
+                    progressDialog.dismiss();
+
+                    final String authorizeUrl = (String) responseMap.get("authorize_url");
+                    final String scopes = (String) responseMap.get("scopes");
+                    final String state = (String) responseMap.get("state");
+                    final String client_id = (String) responseMap.get("client_id");
+
+                    Intent intent = new Intent(RegistrationActivity2.this, OauthActivity.class);
+                    intent.putExtra(OauthActivity.STATE, state);
+                    intent.putExtra(OauthActivity.CLIENT_ID, client_id);
+                    intent.putExtra(OauthActivity.OAUTH_URL, authorizeUrl);
+                    intent.putExtra(OauthActivity.SCOPES, scopes);
+
+                    startActivityForResult(intent, START_OAUTH_REQUEST_CODE);
+
+
+                } catch (Exception e) {
+                    L.d(e);
+                    mUIHandler.post(showErrorDialog);
+                }
+            }
+        });
+    }
+
+    private void registerWithOauthCode(final String code) {
+        final String timestamp = "" + mWiz.getTimestamp();
+        final String deviceId = mWiz.getDeviceId();
+        final String registrationId = mWiz.getRegistrationId();
+        final String installId = mWiz.getInstallationId();
+        // Make call to Rogerthat webfarm
+        final ProgressDialog progressDialog = new ProgressDialog(RegistrationActivity2.this);
+        progressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+        progressDialog.setMessage(getString(R.string.loading));
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+        final SafeRunnable showErrorDialog = new SafeRunnable() {
+            @Override
+            protected void safeRun() throws Exception {
+                T.UI();
+                progressDialog.dismiss();
+                AlertDialog.Builder builder = new AlertDialog.Builder(RegistrationActivity2.this);
+                builder.setMessage(R.string.registration_error);
+                builder.setPositiveButton(R.string.rogerthat, null);
+                AlertDialog dialog = builder.create();
+                dialog.show();
+            }
+        };
+
+        mWorkerHandler.post(new SafeRunnable() {
+            @Override
+            protected void safeRun() throws Exception {
+                T.REGISTRATION();
+                String version = "1";
+                String signature = Security.sha256(version + " " + installId + " " + timestamp + " " + deviceId + " "
+                        + registrationId + " " + code + CloudConstants.REGISTRATION_MAIN_SIGNATURE);
+
+                HttpPost httppost = new HttpPost(CloudConstants.REGISTRATION_OAUTH_REGISTERED_URL);
+                try {
+                    List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(8);
+                    nameValuePairs.add(new BasicNameValuePair("version", version));
+                    nameValuePairs.add(new BasicNameValuePair("registration_time", timestamp));
+                    nameValuePairs.add(new BasicNameValuePair("device_id", deviceId));
+                    nameValuePairs.add(new BasicNameValuePair("registration_id", registrationId));
+                    nameValuePairs.add(new BasicNameValuePair("signature", signature));
+                    nameValuePairs.add(new BasicNameValuePair("install_id", installId));
+                    nameValuePairs.add(new BasicNameValuePair("language", Locale.getDefault().getLanguage()));
+                    nameValuePairs.add(new BasicNameValuePair("country", Locale.getDefault().getCountry()));
+                    nameValuePairs.add(new BasicNameValuePair("code", code));
+                    nameValuePairs.add(new BasicNameValuePair("app_id", CloudConstants.APP_ID));
+                    nameValuePairs.add(new BasicNameValuePair("use_xmpp_kick", CloudConstants.USE_XMPP_KICK_CHANNEL
+                            + ""));
+                    nameValuePairs.add(new BasicNameValuePair("GCM_registration_id", mGCMRegistrationId));
+
+                    httppost.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+
+                    // Execute HTTP Post Request
+                    HttpResponse response = mHttpClient.execute(httppost);
+
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    HttpEntity entity = response.getEntity();
+
+                    if (entity == null) {
+                        mUIHandler.post(showErrorDialog);
+                        return;
+                    }
+
+                    @SuppressWarnings("unchecked")
+                    final Map<String, Object> responseMap = (Map<String, Object>) JSONValue
+                            .parse(new InputStreamReader(entity.getContent()));
+
+                    if (statusCode != 200 || responseMap == null) {
+                        if (statusCode == 500 && responseMap != null) {
+                            final String errorMessage = (String) responseMap.get("error");
+                            if (errorMessage != null) {
+                                mUIHandler.post(new SafeRunnable() {
+                                    @Override
+                                    protected void safeRun() throws Exception {
+                                        T.UI();
+                                        progressDialog.dismiss();
+                                        AlertDialog.Builder builder = new AlertDialog.Builder(
+                                                RegistrationActivity2.this);
+                                        builder.setMessage(errorMessage);
+                                        builder.setPositiveButton(R.string.rogerthat, null);
+                                        AlertDialog dialog = builder.create();
+                                        dialog.show();
+                                    }
+                                });
+                                return;
+                            }
+                        }
+                        mUIHandler.post(showErrorDialog);
+                        return;
+                    }
+
+                    progressDialog.dismiss();
+
+                    JSONObject account = (JSONObject) responseMap.get("account");
+                    final String email = (String) responseMap.get("email");
+                    mAgeAndGenderSet = (Boolean) responseMap.get("age_and_gender_set");
+                    final RegistrationInfo info = new RegistrationInfo(email, new Credentials((String) account
+                            .get("account"), (String) account.get("password")));
+                    mUIHandler.post(new SafeRunnable() {
+                        @Override
+                        protected void safeRun() throws Exception {
+                            T.UI();
+                            mWiz.setEmail(email);
+                            mWiz.save();
+                            hideNotification();
+                            tryConnect(
+                                    progressDialog,
+                                    1,
+                                    getString(R.string.registration_establish_connection, email,
+                                            getString(R.string.app_name)) + " ", info);
+                        }
+                    });
+
+                } catch (Exception e) {
+                    L.d(e);
+                    mUIHandler.post(showErrorDialog);
+                }
+            }
+        });
+    }
+
     @Override
     public void onConfigurationChanged(android.content.res.Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
@@ -767,9 +1011,25 @@ public class RegistrationActivity2 extends ServiceBoundActivity {
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        final Session session = Session.getActiveSession();
-        if (session != null) {
-            session.onActivityResult(this, requestCode, resultCode, data);
+
+        if (requestCode == START_OAUTH_REQUEST_CODE) {
+            if (resultCode == Activity.RESULT_OK) {
+                if (data.getBooleanExtra(OauthActivity.SUCCESS, false)) {
+                    registerWithOauthCode(data.getStringExtra(OauthActivity.RESULT));
+                } else {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(RegistrationActivity2.this);
+                    builder.setMessage(data.getStringExtra(OauthActivity.RESULT));
+                    builder.setPositiveButton(R.string.rogerthat, null);
+                    AlertDialog dialog = builder.create();
+                    dialog.show();
+                    return;
+                }
+            }
+        } else {
+            final Session session = Session.getActiveSession();
+            if (session != null) {
+                session.onActivityResult(this, requestCode, resultCode, data);
+            }
         }
     }
 
@@ -995,11 +1255,45 @@ public class RegistrationActivity2 extends ServiceBoundActivity {
 
             @Override
             public void pageDisplayed(Button back, Button next, ViewFlipper switcher) {
-                if (AppConstants.FACEBOOK_APP_ID == null || !AppConstants.FACEBOOK_REGISTRATION) {
-                    sendRegistrationStep(RegistrationWizard2.REGISTRATION_STEP_EMAIL_LOGIN);
+                if (AppConstants.getRegistrationType() == AppConstants.REGISTRATION_TYPE_OAUTH) {
                     mWiz.proceedToNextPage();
                 } else {
+                    if (AppConstants.FACEBOOK_APP_ID == null || !AppConstants.FACEBOOK_REGISTRATION) {
+                        sendRegistrationStep(RegistrationWizard2.REGISTRATION_STEP_EMAIL_LOGIN);
+                        mWiz.proceedToNextPage();
+                    } else {
+                        mEnterEmailAutoCompleteTextView.setThreshold(1000); // Prevent popping up automatically
+                    }
+                }
+            }
+
+            @Override
+            public String getTitle() {
+                return null;
+            }
+
+            @Override
+            public boolean beforeNextClicked(Button back, Button next, ViewFlipper switcher) {
+                return false;
+            }
+
+            @Override
+            public boolean beforeBackClicked(Button back, Button next, ViewFlipper switcher) {
+                return false;
+            }
+        });
+    }
+
+    private void addOauthMethodHandler() {
+        mWiz.addPageHandler(new Wizard.PageHandler() {
+
+            @Override
+            public void pageDisplayed(Button back, Button next, ViewFlipper switcher) {
+                if (AppConstants.getRegistrationType() == AppConstants.REGISTRATION_TYPE_OAUTH) {
                     mEnterEmailAutoCompleteTextView.setThreshold(1000); // Prevent popping up automatically
+                } else {
+                    sendRegistrationStep(RegistrationWizard2.REGISTRATION_STEP_EMAIL_LOGIN);
+                    mWiz.proceedToNextPage();
                 }
             }
 

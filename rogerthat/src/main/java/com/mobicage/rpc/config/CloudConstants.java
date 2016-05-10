@@ -53,6 +53,11 @@ public class CloudConstants {
         + "/unauthenticated/mobi/registration/verify_email";
     public final static String REGISTRATION_FACEBOOK_URL = HTTPS_BASE_URL
         + "/unauthenticated/mobi/registration/register_facebook";
+    public final static String REGISTRATION_OAUTH_INFO_URL = HTTPS_BASE_URL
+            + "/unauthenticated/mobi/registration/oauth/info";
+    public final static String REGISTRATION_OAUTH_REGISTERED_URL = HTTPS_BASE_URL
+            + "/unauthenticated/mobi/registration/oauth/registered";
+
     public final static String REGISTRATION_QR_URL = HTTPS_BASE_URL + "/unauthenticated/mobi/registration/register_qr";
     public final static String REGISTRATION_FINISH_URL = HTTPS_BASE_URL + "/unauthenticated/mobi/registration/finish";
     public final static String REGISTRATION_PAGE_URL_FACEBOOK = HTTPS_BASE_URL
@@ -97,7 +102,7 @@ public class CloudConstants {
     public final static String GCM_SENDER_ID = CustomCloudConstants.GCM_SENDER_ID;
 
     public static boolean isRogerthatApp() {
-    return AppConstants.getAppType() == AppConstants.APP_TYPE_ROGERTHAT;
+        return AppConstants.getAppType() == AppConstants.APP_TYPE_ROGERTHAT;
     }
 
     public static boolean isEnterpriseApp() {

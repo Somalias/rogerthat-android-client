@@ -109,6 +109,7 @@
 
                 <data android:scheme="rogerthat" />
                 <data android:scheme="mdp-rogerthat" android:host="x-callback-url" />
+                <data android:scheme="oauth-rogerthat" android:host="x-callback-url" />
             </intent-filter>
         </activity-alias>
 
@@ -299,6 +300,11 @@
         <activity
             android:name="com.mobicage.rogerthat.MoreActivity"
             android:screenOrientation="portrait" >
+        </activity>
+        <activity
+            android:name="com.mobicage.rogerthat.OauthActivity"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.NoTitleBar" >
         </activity>
 
         <receiver

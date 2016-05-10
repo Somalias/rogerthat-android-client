@@ -31,6 +31,13 @@ public class AppConstants {
         return APP_TYPE_ROGERTHAT;
     };
 
+    public static final int REGISTRATION_TYPE_DEFAULT = 1;
+    public static final int REGISTRATION_TYPE_OAUTH = 2;
+
+    public static int getRegistrationType() {
+        return REGISTRATION_TYPE_OAUTH;
+    };
+
     // Customized by App flavor
     public static final String APP_ID = "rogerthat";
     public static final int HOME_ACTIVITY_LAYOUT = R.layout.homescreen;

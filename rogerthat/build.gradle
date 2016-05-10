@@ -58,6 +58,9 @@ repositories {
 dependencies {
     compile 'com.android.support:support-v4:23.2.1'
     compile 'com.android.support:appcompat-v7:23.2.1'
+    compile ('com.google.api-client:google-api-client-xml:1.18.0-rc') {
+        exclude group: 'com.google.code.findbugs'
+    }
     compile 'com.google.android.gms:play-services-base:6.5.87'
     compile 'com.google.android.gms:play-services-location:6.5.87'
     compile 'com.facebook.android:facebook-android-sdk:3.23.1'
