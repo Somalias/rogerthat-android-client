@@ -476,6 +476,13 @@ def convert_config():
 
 
     speech_to_text = bool_str(doc["APP_CONSTANTS"].get("SPEECH_TO_TEXT", False))
+    registration_type = long(doc['APP_CONSTANTS'].get('REGISTRATION_TYPE', 1))
+    if registration_type == 1:
+        registration_type = 'REGISTRATION_TYPE_DEFAULT'
+    elif registration_type == 2:
+        registration_type = 'REGISTRATION_TYPE_OAUTH'
+    else:
+        raise Exception('Invalid registration type %d' % registration_type)
 
     output = u'''%(LICENSE)s
 
@@ -490,8 +497,14 @@ public class AppConstants {
     static final int APP_TYPE_CONTENT_BRANDING = 3;
     static final int APP_TYPE_YSAAA = 4;
 
+    public static final int REGISTRATION_TYPE_DEFAULT = 1;
+    public static final int REGISTRATION_TYPE_OAUTH = 2;
     static int getAppType() {
         return %(app_type)s;
+    };
+
+    public static int getRegistrationType() {
+        return %(registration_type)s;
     };
 
     // Customized by App flavor
@@ -552,7 +565,8 @@ public class AppConstants {
            about_facebook=about_facebook,
            about_facebook_url=about_facebook_url,
            speech_to_text=speech_to_text,
-           app_service_guid=app_service_guid)
+           app_service_guid=app_service_guid,
+           registration_type=registration_type)
 
     path = os.path.join(SRC_JAVA_DIR, "com", "mobicage", "rpc", "config")
     if not os.path.exists(path):
